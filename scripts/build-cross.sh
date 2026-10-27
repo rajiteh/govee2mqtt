@@ -17,7 +17,7 @@ case "$TARGETPLATFORM" in
     ;;
 esac
 
-cross build --target $TARGET --release --bin govee
+cross build --locked --target $TARGET --release --bin govee
 
 mkdir -p docker-target/$TARGETPLATFORM
 cp target/$TARGET/release/govee docker-target/$TARGETPLATFORM

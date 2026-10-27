@@ -1,5 +1,4 @@
 ARG BUILD_FROM
-FROM ghcr.io/wez/govee2mqtt:latest AS govee2mqtt
 FROM $BUILD_FROM
 
 # Refresh the Bookworm base image's public CA store at build time.
@@ -9,7 +8,6 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 COPY run.sh /run.sh
-COPY --from=govee2mqtt /app/govee /app/
-COPY --from=govee2mqtt /app/assets /app/assets/
-COPY --from=govee2mqtt /app/AmazonRootCA1.pem /app/
+# The integration workflow stages its own locked build and source assets here.
+COPY app/ /app/
 CMD [ "/run.sh" ]

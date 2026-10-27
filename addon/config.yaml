@@ -1,9 +1,9 @@
-name: Govee to MQTT Bridge
-image: ghcr.io/wez/govee2mqtt-{arch}
-version: "2026.03.25-ab9deb66"
+name: Govee to MQTT Bridge (CA trust integration)
+image: ghcr.io/rajiteh/govee2mqtt-{arch}
+version: "2026.10.27-ca-trust.1"
 slug: govee2mqtt
 description: Control Govee Devices
-url: https://github.com/wez/govee2mqtt
+url: https://github.com/rajiteh/govee2mqtt/tree/integration/ca-trust-ghcr
 arch:
   - amd64
   - aarch64

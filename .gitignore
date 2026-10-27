@@ -2,6 +2,7 @@ target
 .*sw?
 .env
 docker-target
+/addon/app/
 node_modules
 package.json
 package-lock.json
