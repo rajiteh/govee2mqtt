@@ -63,7 +63,7 @@ jobs:
   addon:
     if: github.repository == 'rajiteh/govee2mqtt' && github.ref == 'refs/heads/integration/ca-trust-ghcr'
     needs: compile
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.runner }}
     permissions:
       contents: read
       packages: write
@@ -71,7 +71,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        arch: [amd64, aarch64]
+        include:
+          - arch: amd64
+            runner: ubuntu-24.04
+          - arch: aarch64
+            runner: ubuntu-24.04-arm
     steps:
       - uses: actions/checkout@v6
         with:
@@ -88,18 +92,47 @@ jobs:
           (cd addon/app && sha256sum -c govee.sha256)
           sha256sum -c addon/app/Cargo.lock.sha256
           chmod 0755 addon/app/govee
-      - name: Login to personal GHCR with the existing job token
-        uses: docker/login-action@v4
-        with:
-          registry: ghcr.io
-          username: rajiteh
-          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Read the reviewed image and base configuration
+        id: config
+        env:
+          ARCH: ${{ matrix.arch }}
+        run: |
+          set -eu
+          python3 -m venv "$RUNNER_TEMP/govee-config"
+          "$RUNNER_TEMP/govee-config/bin/pip" install --disable-pip-version-check PyYAML==6.0.3
+          "$RUNNER_TEMP/govee-config/bin/python" - <<'PYCONFIG'
+          import os, yaml
+          from pathlib import Path
+          config = yaml.safe_load(Path('addon/config.yaml').read_text())
+          build = yaml.safe_load(Path('addon/build.yaml').read_text())
+          arch = os.environ['ARCH']
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
+              print('image=' + config['image'].replace('{arch}', arch), file=output)
+              print('version=' + config['version'], file=output)
+              print('base=' + build['build_from'][arch], file=output)
+          PYCONFIG
       - name: Build and sign the personal add-on image
-        uses: home-assistant/builder@2026.02.1
+        uses: home-assistant/builder/actions/build-image@7412f0023ea9b6e58e8bb5059f1660f51376f49a # 2026.09.0
         with:
-          args: |
-            --${{ matrix.arch }} \
-            --cosign \
-            --no-cache \
-            --no-latest \
-            --target /data/addon
+          arch: ${{ matrix.arch }}
+          context: addon
+          image: ${{ steps.config.outputs.image }}
+          image-tags: ${{ steps.config.outputs.version }}
+          version: ${{ steps.config.outputs.version }}
+          skip-existing: ${{ steps.config.outputs.version }}
+          container-registry-username: rajiteh
+          container-registry-password: ${{ secrets.GITHUB_TOKEN }}
+          push: "true"
+          cosign: "true"
+          cosign-base-verify: ${{ steps.config.outputs.base }}
+          cosign-base-identity: https://github.com/home-assistant/docker-base/.*
+          cosign-identity: '^https://github\.com/rajiteh/govee2mqtt/\.github/workflows/build\.yml@refs/heads/integration/ca-trust-ghcr$'
+          cache-gha: "false"
+          cache-image-tag: ${{ steps.config.outputs.version }}
+          build-args: |
+            BUILD_FROM=${{ steps.config.outputs.base }}
+          labels: |
+            org.opencontainers.image.title=Home Assistant Add-on: Govee to MQTT Bridge
+            org.opencontainers.image.description=Acts as a bridge between Govee devices and Home Assistant, via the Home Assistant MQTT Integration.
+            org.opencontainers.image.licenses=MIT
+            org.opencontainers.image.revision=${{ github.sha }}
